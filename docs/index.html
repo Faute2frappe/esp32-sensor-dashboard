@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#101827"><title>ESP32 Sensor Dashboard — Démo</title>
+<style>
+:root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color-scheme:dark;background:#0c1423;color:#f0f5ff}*{box-sizing:border-box}body{margin:0;padding:24px}main{max-width:960px;margin:auto}.top{display:flex;align-items:center;justify-content:space-between;gap:15px;flex-wrap:wrap}h1{font-size:clamp(1.6rem,5vw,2.5rem);margin:0}p,.muted{color:#a8bad2}.tag{display:inline-block;border:1px solid #557da7;background:#172e48;border-radius:99px;padding:7px 12px;font-size:.82rem}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin:24px 0}.card,.panel{background:#18253a;border:1px solid #304663;border-radius:17px;padding:22px}.label{color:#b7c9df}.value{font-size:clamp(2rem,6vw,3rem);font-weight:750;margin-top:12px}.panel{margin:16px 0}button{background:#3b82f6;color:white;border:0;border-radius:9px;padding:12px 16px;font-weight:650;cursor:pointer}button:hover{background:#2563eb}button:focus-visible{outline:3px solid #fbbf24;outline-offset:3px}.actions{display:flex;flex-wrap:wrap;gap:12px}canvas{display:block;width:100%;height:220px}small{color:#a8bad2}#status{color:#b8d9ff}a{color:#8dbbff}
+</style>
+</head>
+<body><main>
+<div class="top"><div><h1>ESP32 Sensor Dashboard</h1><p>Suivi de capteurs • Démonstration interactive</p></div><span class="tag">● Données simulées — aucun ESP32 connecté</span></div>
+<div class="grid">
+<section class="card"><div class="label">🌡️ Température</div><div class="value" id="temp" aria-live="polite">—</div></section>
+<section class="card"><div class="label">💧 Humidité</div><div class="value" id="hum" aria-live="polite">—</div></section>
+<section class="card"><div class="label">☀️ Luminosité (brute, 0–4095)</div><div class="value" id="light" aria-live="polite">—</div></section>
+</div>
+<section class="panel"><div class="top"><h2>Historique de température</h2><small>30 dernières mesures simulées</small></div><canvas id="chart" role="img" aria-label="Courbe de température simulée"></canvas></section>
+<section class="panel"><div class="actions"><button id="toggle" type="button">Mettre en pause</button><button id="export" type="button">Exporter le CSV</button></div><p id="status" role="status">Initialisation de la simulation…</p><small>Les valeurs sont générées localement dans votre navigateur, toutes les 3 secondes. Aucun capteur réel n'est mesuré et aucune donnée n'est envoyée.</small></section>
+<p><a href="https://github.com/Faute2frappe/esp32-sensor-dashboard">Consulter le code source sur GitHub</a></p>
+</main><script>
+'use strict';
+const $ = id => document.getElementById(id);
+const points=[];
+let paused=false;
+function sample(){const t=Date.now();const n=points.length;return {time:new Date(t).toISOString(),temperature:Math.round((22+Math.sin(n/5)*2+(Math.random()-.5)*.5)*10)/10,humidity:Math.round((48+Math.cos(n/7)*6+(Math.random()-.5)*2)*10)/10,light_raw:Math.max(0,Math.min(4095,Math.round(2000+Math.sin(n/6)*1100+(Math.random()-.5)*400)))}}
+function draw(){const canvas=$('chart'),ratio=window.devicePixelRatio||1,w=canvas.clientWidth,h=canvas.clientHeight;canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.clearRect(0,0,w,h);const pad=30;const vals=points.slice(-30).map(p=>p.temperature);if(!vals.length)return;const min=Math.floor(Math.min(...vals)-1),max=Math.ceil(Math.max(...vals)+1);ctx.strokeStyle='#314b69';ctx.fillStyle='#abc5e1';ctx.font='12px system-ui';for(let i=0;i<4;i++){const y=pad+(h-pad*2)*i/3;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(w-12,y);ctx.stroke();ctx.fillText((max-(max-min)*i/3).toFixed(1),0,y+3)}ctx.strokeStyle='#6aa9ff';ctx.lineWidth=3;ctx.beginPath();vals.forEach((v,i)=>{const x=pad+(w-pad-44)*(vals.length===1?.5:i/(vals.length-1));const y=pad+(h-pad*2)*(max-v)/(max-min);i?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke()}
+function tick(){if(paused)return;const data=sample();points.push(data);if(points.length>300)points.shift();$('temp').textContent=data.temperature.toFixed(1)+' °C';$('hum').textContent=data.humidity.toFixed(1)+' %';$('light').textContent=String(data.light_raw);$('status').textContent='Simulation mise à jour à '+new Date().toLocaleTimeString('fr-FR');draw()}
+$('toggle').addEventListener('click',()=>{paused=!paused;$('toggle').textContent=paused?'Reprendre la simulation':'Mettre en pause';$('status').textContent=paused?'Simulation en pause':'Simulation reprise';if(!paused)tick()});
+$('export').addEventListener('click',()=>{const content=['time,temperature_c,humidity_pct,light_raw',...points.map(p=>[p.time,p.temperature,p.humidity,p.light_raw].join(','))].join('\n');const blob=new Blob([content],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='esp32-demo-mesures.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)});
+window.addEventListener('resize',draw);tick();setInterval(tick,3000);
+</script></body></html>
